@@ -1,10 +1,12 @@
 #include <Wire.h>
 #include <SSD1306.h>
 #include <OLEDDisplayUi.h>
+#include <Adafruit_APDS9960.h>
 #include "images.h"
 
 SSD1306Wire display(0x3C,25,26,GEOMETRY_128_32);
 OLEDDisplayUi ui ( &display );
+Adafruit_APDS9960 apds;
 
 unsigned long startTime;
 
@@ -88,6 +90,19 @@ void setup()
   nWiFiLevel = 100;
   randomSeed(analogRead(18));
   startTime = millis();
+
+  if(!apds.begin())
+  {
+    Serial.println("failed to initialize device! Please check your wiring.");
+  }
+  else
+  {
+    //gesture mode will be entered once proximity mode senses something close
+    apds.enableProximity(true);
+    apds.enableGesture(true);
+    Serial.println("Device initialized!");
+  }
+  
 }
 
 void loop()
@@ -101,6 +116,20 @@ void loop()
     //Serial.print("Remaining Time Budget = ");
     //Serial.print(remainingTimeBudget);
     //Serial.println(" ms");
+    //read a gesture from the device
+    uint8_t gesture = apds.readGesture();
+    if(gesture == APDS9960_DOWN) 
+    {
+      Serial.println("v");
+      nFuelLevel-=10;
+    }
+    if(gesture == APDS9960_UP)
+    {
+      Serial.println("^");
+      nFuelLevel+=10;
+    }
+    if(gesture == APDS9960_LEFT) Serial.println("<");
+    if(gesture == APDS9960_RIGHT) Serial.println(">");
     if ((millis()-startTime)>1000)
     {
       startTime=millis();
