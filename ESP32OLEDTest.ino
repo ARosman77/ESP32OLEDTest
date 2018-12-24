@@ -1,8 +1,10 @@
+#include <time.h>
 #include <WiFi.h>
 #include <WiFiUDP.h>
 #include <Preferences.h>
 #include <ESP32WebServer.h>
 #include <WiFiClient.h>
+#include <NTPClient.h>
 #include <Wire.h>
 #include <SSD1306.h>
 #include <BME280I2C.h>
@@ -100,6 +102,11 @@ void handleNotFound()
   webServer.send(404, "text/plain", message);
 }
 
+// NTP Time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP,60*60);
+
+
 unsigned long startTime;
 long rssiLevel;
 int nFuelLevel;
@@ -123,8 +130,15 @@ void drawFuelLevel(OLEDDisplay *display, OLEDDisplayUiState* state)
 
 void drawTime(OLEDDisplay *display, OLEDDisplayUiState* state)
 {
+  // new version using time.h
+  time_t test = timeClient.getEpochTime();
+  struct tm timeinfo;
+  timeinfo = *localtime(&test);
   String output;
-  output = "23/12  18:20";
+  
+  String sHours = timeinfo.tm_hour < 10 ? "0" + String(timeinfo.tm_hour) : String(timeinfo.tm_hour);
+  String sMinutes = timeinfo.tm_min < 10 ? "0" + String(timeinfo.tm_min) : String(timeinfo.tm_min);
+  output = String(timeinfo.tm_mday) + "/" + String(timeinfo.tm_mon+1) + "  " + sHours + ":" + sMinutes;
   display->setTextAlignment(TEXT_ALIGN_RIGHT);
   display->setFont(ArialMT_Plain_10);
   display->drawString(128, 0, output);
@@ -302,6 +316,9 @@ void setup_CL()
   rssiLevel = WiFi.RSSI();
   Serial.print("RSSI:");
   Serial.println(rssiLevel);
+
+  // start sync with NTP
+  timeClient.begin();
   
 }
 
@@ -316,7 +333,13 @@ void loop()
     // Serial.print("Remaining Time Budget = ");
     // Serial.print(remainingTimeBudget);
     // Serial.println(" ms");
+    
+    // handle client request
     webServer.handleClient();
+
+    // handle NTP sync
+    timeClient.update();
+    
     //read a gesture from the device
     uint8_t gesture = apds.readGesture();
     if(gesture == APDS9960_DOWN) 
